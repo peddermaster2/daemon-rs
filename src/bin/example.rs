@@ -2,6 +2,7 @@ extern crate daemon;
 
 use daemon::Daemon;
 use daemon::DaemonRunner;
+use daemon::IsDaemon;
 use daemon::State;
 use std::env;
 use std::fs::OpenOptions;
@@ -14,8 +15,13 @@ fn main() -> Result<(), Error> {
     let daemon = Daemon {
         name: "example".to_string(),
     };
-    daemon.run(move |rx: Receiver<State>| {
+    daemon.run(move |rx: Receiver<State>, is_daemon: IsDaemon| {
         log("Worker started.");
+        match is_daemon {
+            IsDaemon::Yes => log("Real daemon"),
+            IsDaemon::No => log("Fake daemon"),
+            IsDaemon::Unknown => log("???? daemon"),
+        }
         for signal in rx.iter() {
             match signal {
                 State::Start => log("Worker: Start"),

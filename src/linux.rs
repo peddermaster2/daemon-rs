@@ -28,16 +28,16 @@ trait DaemonFunc {
     fn take_tx(&mut self) -> Option<Sender<State>>;
 }
 
-struct DaemonFuncHolder<F: FnOnce(Receiver<State>)> {
+struct DaemonFuncHolder<F: FnOnce(Receiver<State>, IsDaemon)> {
     tx: Option<Sender<State>>,
     func: Option<(F, Receiver<State>)>,
 }
 
-impl<F: FnOnce(Receiver<State>)> DaemonFunc for DaemonFuncHolder<F> {
+impl<F: FnOnce(Receiver<State>, IsDaemon)> DaemonFunc for DaemonFuncHolder<F> {
     fn exec(&mut self) -> Result<(), Error> {
         match self.func.take() {
             Some((func, rx)) => {
-                func(rx);
+                func(rx, IsDaemon::Unknown);
                 Ok(())
             }
             None => Err(Error::new(
@@ -74,7 +74,7 @@ fn daemon_wrapper<R, F: FnOnce(&mut DaemonHolder) -> R>(func: F) -> R {
 }
 
 impl DaemonRunner for Daemon {
-    fn run<F: 'static + FnOnce(Receiver<State>)>(&self, func: F) -> Result<(), Error> {
+    fn run<F: 'static + FnOnce(Receiver<State>, IsDaemon)>(&self, func: F) -> Result<(), Error> {
         let (tx, rx) = channel();
         tx.send(State::Start).unwrap();
         let mut daemon = DaemonStatic {

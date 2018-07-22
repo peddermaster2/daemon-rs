@@ -30,21 +30,21 @@ struct DaemonStatic {
 }
 
 trait DaemonFunc {
-    fn exec(&mut self) -> Result<(), Error>;
+    fn exec(&mut self, IsDaemon) -> Result<(), Error>;
     fn send(&mut self, state: State) -> Result<(), Error>;
     fn take_tx(&mut self) -> Option<Sender<State>>;
 }
 
-struct DaemonFuncHolder<F: FnOnce(Receiver<State>)> {
+struct DaemonFuncHolder<F: FnOnce(Receiver<State>, IsDaemon)> {
     tx: Option<Sender<State>>,
     func: Option<(F, Receiver<State>)>,
 }
 
-impl<F: FnOnce(Receiver<State>)> DaemonFunc for DaemonFuncHolder<F> {
-    fn exec(&mut self) -> Result<(), Error> {
+impl<F: FnOnce(Receiver<State>, IsDaemon)> DaemonFunc for DaemonFuncHolder<F> {
+    fn exec(&mut self, is_daemon: IsDaemon) -> Result<(), Error> {
         match self.func.take() {
             Some((func, rx)) => {
-                func(rx);
+                func(rx, is_daemon);
                 Ok(())
             }
             None => Err(Error::new(
@@ -82,7 +82,7 @@ fn daemon_wrapper<R, F: FnOnce(&mut DaemonHolder) -> R>(func: F) -> R {
 }
 
 impl DaemonRunner for Daemon {
-    fn run<F: 'static + FnOnce(Receiver<State>)>(&self, func: F) -> Result<(), Error> {
+    fn run<F: 'static + FnOnce(Receiver<State>, IsDaemon)>(&self, func: F) -> Result<(), Error> {
         let (tx, rx) = channel();
         tx.send(State::Start).unwrap();
         let mut daemon = DaemonStatic {
@@ -138,7 +138,7 @@ unsafe fn daemon_console(daemon: &mut DaemonStatic) -> Result<(), Error> {
     if SetConsoleCtrlHandler(Some(console_handler), TRUE) == FALSE {
         return Err(Error::last_os_error());
     }
-    result = daemon.holder.exec();
+    result = daemon.holder.exec(IsDaemon::No);
     if SetConsoleCtrlHandler(Some(console_handler), FALSE) == FALSE {
         return Err(Error::last_os_error());
     }
@@ -188,7 +188,7 @@ unsafe extern "system" fn service_main(
         }
     });
     if let Some(daemon) = daemon_holder {
-        daemon.holder.exec().unwrap();
+        daemon.holder.exec(IsDaemon::Yes).unwrap();
     }
     daemon_wrapper(|daemon_static: &mut DaemonHolder| {
         if daemon_static.holder != daemon_null() {
