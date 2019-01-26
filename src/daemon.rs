@@ -2,6 +2,7 @@ use std::io;
 use std::sync::mpsc::Receiver;
 
 /// The state of the daemon
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum State {
     /// The daemon is started
     Start,
@@ -17,6 +18,7 @@ pub enum State {
 /// which is provided by the `DaemonRunner` trait.
 ///
 /// See the `bin/examples.rs` for usage.
+#[derive(Debug)]
 pub struct Daemon {
     /// The name for the daemon
     pub name: String,

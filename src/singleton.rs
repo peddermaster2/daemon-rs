@@ -56,6 +56,7 @@ macro_rules! declare_singleton {
 
 #[cfg(test)]
 mod test {
+    #[allow(clippy::single_match)]
     #[test]
     fn smoke_test() {
         declare_singleton!(simple_singleton, u32, 0);
