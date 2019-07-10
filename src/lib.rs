@@ -1,3 +1,5 @@
+#![allow(unknown_lints)]
+
 #[cfg(target_os = "windows")]
 extern crate winapi;
 

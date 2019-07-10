@@ -8,14 +8,14 @@ use std::sync::mpsc::Sender;
 
 use winapi::shared::minwindef::{BOOL, DWORD, FALSE, LPVOID, TRUE};
 use winapi::um::consoleapi::SetConsoleCtrlHandler;
-use winapi::um::winnt::{SERVICE_WIN32_OWN_PROCESS, LPWSTR};
+use winapi::um::winnt::{LPWSTR, SERVICE_WIN32_OWN_PROCESS};
 use winapi::um::winsvc::*;
 
 declare_singleton!(
     singleton,
     DaemonHolder,
     DaemonHolder {
-        holder: 0 as *mut DaemonStatic
+        holder: ptr::null_mut()
     }
 );
 
@@ -25,7 +25,7 @@ struct DaemonHolder {
 
 struct DaemonStatic {
     name: String,
-    holder: Box<DaemonFunc>,
+    holder: Box<dyn DaemonFunc>,
     handle: SERVICE_STATUS_HANDLE,
 }
 
@@ -69,6 +69,7 @@ impl<F: FnOnce(Receiver<State>)> DaemonFunc for DaemonFuncHolder<F> {
     }
 }
 
+#[allow(clippy::let_and_return)]
 fn daemon_wrapper<R, F: FnOnce(&mut DaemonHolder) -> R>(func: F) -> R {
     let singleton = singleton();
     let result = match singleton.lock() {
@@ -206,16 +207,15 @@ unsafe extern "system" fn service_handler(
     daemon_wrapper(|daemon_static: &mut DaemonHolder| {
         let daemon = &mut *daemon_static.holder;
         match dw_control {
-            SERVICE_CONTROL_STOP | SERVICE_CONTROL_SHUTDOWN => match daemon.holder.take_tx() {
-                Some(ref tx) => {
+            SERVICE_CONTROL_STOP | SERVICE_CONTROL_SHUTDOWN => {
+                if let Some(ref tx) = daemon.holder.take_tx() {
                     SetServiceStatus(
                         daemon.handle,
                         &mut create_service_status(SERVICE_STOP_PENDING),
                     );
                     let _ = tx.send(State::Stop);
                 }
-                None => {}
-            },
+            }
             _ => {}
         };
     });
@@ -240,5 +240,5 @@ unsafe extern "system" fn console_handler(_: DWORD) -> BOOL {
 }
 
 fn daemon_null() -> *mut DaemonStatic {
-    0 as *mut DaemonStatic
+    ptr::null_mut()
 }

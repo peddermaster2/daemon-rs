@@ -42,7 +42,7 @@ fn log_safe(message: &str) -> Result<(), Error> {
         .write(true)
         .append(true)
         .open(&path)?;
-    file.write(message.as_bytes())?;
-    file.write(b"\n")?;
+    file.write_all(message.as_bytes())?;
+    file.write_all(b"\n")?;
     Ok(())
 }
